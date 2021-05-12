@@ -1,0 +1,297 @@
+import torch
+import torchvision
+import torch.optim as optim
+
+import time
+import math
+from itertools import islice
+from operator import itemgetter
+
+from segnet_basic import SegNetBasic
+#from crop_datasets import Crop_Dataset
+import crop_datasets
+
+import numpy as np
+from skimage import io
+
+import argparse
+
+from vegseg_transforms import Normalize, Compose, Resize, ToTensor
+
+def save_model(net, optimizer, epoch, iteration, PATH):
+    torch.save({
+        'epoch': epoch,
+        'net_state_dict': net.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'iteration': iteration
+        }, PATH)
+
+def load_model(PATH, net, optimizer, max_iteration=None):
+    #net = SegNetBasic(*args, **kwargs)
+    #optimizer = torch.optim.Adam(*args, **kwargs)
+    
+    checkpoint = torch.load(PATH)
+    net.load_state_dict(checkpoint['net_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    iteration = checkpoint['iteration']+1
+
+    print("Iteration per epoch {}".format(max_iteration))
+    print("Loaded epoch {} iteration {}".format(epoch+1, iteration))
+
+    if not max_iteration == None:
+        if iteration == max_iteration:
+            iteration = 0
+            epoch += 1
+
+    return net, optimizer, epoch, iteration
+    
+def cat_list(images, fill_value=0):
+    max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
+    batch_shape = (len(images),) + max_size
+    batched_imgs = images[0].new(*batch_shape).fill_(fill_value)
+    for img, pad_img in zip(images, batched_imgs):
+        pad_img[..., : img.shape[-2], : img.shape[-1]].copy_(img)
+    return batched_imgs
+
+# Collates into a 4th tensor dimension rather than tuples:
+def collate_fn(batch):
+    images, targets = list(zip(*batch))
+    batched_imgs = cat_list(images, fill_value=0)
+    batched_targets = cat_list(targets, fill_value=255)
+    return batched_imgs, batched_targets
+
+
+def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', start_epoch = 0, start_iteration = 0, print_epoch = 5, print_iteration = 20, net_out_base = 'NET'):
+    net.train()
+    t_start = time.time()
+    print('[Time: %s]' % (time.strftime("%H:%M:%S", time.gmtime())))
+    running_loss_epoch = 0.0
+    print_big_iteration_count = 0
+    for epoch in range(start_epoch, max_epochs):
+        running_loss_iteration = 0.0
+        print_iteration_count = 0
+        if epoch > start_epoch:
+            start_iteration = 0
+        for i, data in islice(enumerate(dataloader, 0), start_iteration, None):
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
+            
+            optimizer.zero_grad()
+
+            outputs = net(inputs)
+
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            
+            #print('[Debug] [Current iteration loss %.3f]' % loss.item())
+            
+            running_loss_epoch += loss.item()
+            running_loss_iteration += loss.item()
+            print_iteration_count += 1
+            print_big_iteration_count += 1
+            if i % print_iteration == (print_iteration-1):
+                t_current = time.time()
+                print('[Time: %s Running: %.5f s] [%d, %5d] loss %.3f' % (time.strftime("%H:%M:%S", time.gmtime()), t_current-t_start, epoch+1, i+1, running_loss_iteration/print_iteration_count))
+                running_loss_iteration = 0.0
+                print_iteration_count = 0
+
+        if epoch % print_epoch == (print_epoch-1):
+            save_path =  './{}_e{}_i{}.pt'.format(net_out_base, epoch+1, i+1)
+            save_model(net = net, optimizer = optimizer, epoch = epoch, iteration = i, PATH = save_path)
+            print('[Time: %s Running: %.5f s] [%d]        loss %.3f, model saved to %s' % (time.strftime("%H:%M:%S", time.gmtime()), t_current-t_start, epoch+1, running_loss_epoch/print_big_iteration_count, save_path))
+            running_loss_epoch = 0.0
+            print_big_iteration_count = 0
+
+
+
+def test(net, criterion, dataloader, device='cpu', save_images = False, out_image_path = "prediction", truth_image_path="truth"):
+    net.eval()
+    
+    total_loss = 0.0
+    
+    t_total_duration = 0
+    
+    with torch.no_grad():
+        for i, data in enumerate(dataloader, 0):
+            inputs, labels = data
+            t_start = time.time()
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = net(inputs)
+            t_duration = time.time() - t_start
+            loss = criterion(outputs, labels)
+            total_loss += loss
+            t_total_duration += t_duration
+
+            print('[Batch size %d, classification time: %.5f] [%d] loss %.3f' % (dataloader.batch_size, t_duration, i, loss))
+            if save_images:
+                for bi, (predicted_image, truth_image) in enumerate(zip(outputs, labels)):
+                    out_image = predicted_image.detach().cpu().numpy()
+                    out_image = np.argmax(out_image, axis = 0).astype(dtype='uint8')
+                    out_truth = truth_image.detach().cpu().numpy().astype(dtype='uint8')
+
+                    out_image = (out_image*127).astype('uint8')
+                    out_truth = (out_truth*127).astype('uint8')
+
+                    io.imsave(fname = './{}_i{}_b{}.png'.format(out_image_path, i, bi), arr = out_image)
+                    io.imsave(fname = './{}_i{}_b{}.png'.format(truth_image_path, i, bi), arr = out_truth)
+                    
+    dlen = len(dataloader.dataset)
+    print('[Average classification time: %.5f per sample] average loss %.3f' % (t_total_duration/dlen, total_loss/dlen))
+
+
+def net_setup(device, class_weights=None):
+    net = SegNetBasic(in_channels = 4, num_classes = 3, final_batch_norm = False)
+    
+    if not class_weights == None:
+        criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
+    
+    #optimizer = torch.optim.SGD(net.parameters(), 
+    #                            weight_decay = 0.0005,
+    #                            momentum = 0.9, # but note the docs, might need to change value: https://pytorch.org/docs/stable/_modules/torch/optim/sgd.html#SGD
+    #                            lr = 0.01)
+
+    net_weights = map(itemgetter(1), filter(lambda x: 'bias' not in x[0], net.named_parameters()))
+    net_biases = map(itemgetter(1), filter(lambda x: 'bias' in x[0], net.named_parameters()))
+    
+    base_lr = 0.01
+    weight_decay = 0.0005
+    momentum = 0.9
+
+    optimizer = torch.optim.SGD([
+                                    {'params': net_weights, 'lr': base_lr, 'weight_decay': weight_decay },
+                                    {'params': net_biases, 'lr': base_lr*2 }
+                                ],
+                                momentum = momentum, # but note the docs, might need to change value: https://pytorch.org/docs/stable/_modules/torch/optim/sgd.html#SGD
+                                lr = base_lr) # probably not needed
+
+    net.to(device)
+    if not class_weights == None:
+        class_weights.to(device)
+    criterion.to(device)
+    
+    return net, optimizer, criterion
+               
+#def makeTorchTensors(sample):
+#    image, label = sample
+#    image = torchvision.transforms.ToTensor()(image)
+#    label = torch.LongTensor(label)
+#    return image, label 
+
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-d", "--data-folder", type=str, required=True)
+    #parser.add_argument("-d", "--data-folder", type=str, required=False, default="/home/pbosilj/Data/CA17/carrots_labelled")
+    
+    mode_parser = parser.add_subparsers(dest = "mode", help = "Train or test model.")
+    test_parser = mode_parser.add_parser("test", description = "Train the model.")
+
+    test_parser.add_argument('-m','--model', type=str, required=True)
+      
+    train_parser = mode_parser.add_parser("train", description = "Evaluate the model only.")
+    
+    train_parser.add_argument('-m','--model', type=str, required=False)
+    
+    train_parser.add_argument("-e", "--epochs", type=int, required = False, default = 10)
+    train_parser.add_argument("-pi", "--print-iteration", type=int, required = False, default = 10)
+    train_parser.add_argument("-pe", "--print-epoch", type=int, required = False, default = 1)
+    train_parser.add_argument("-n", "--net-out-name", type=str, required = True)
+    
+    args = vars(parser.parse_args())
+  
+    # Get the dataset statistics:
+    
+    print("Calculating datasets stats.")
+  
+    carrots_train = crop_datasets.Crop_Dataset(root=args['data_folder'], train=True, sample_size=(384,512), transforms=ToTensor())
+    
+    class_weights = 1.0/carrots_train.get_class_probability()
+    print("\tClass weights: {}".format(class_weights))
+    
+    # Class weights: tensor([ 1.3001, 12.8161,  6.5436])
+    #class_weights = [ 1.3001, 12.8161,  6.5436]
+    
+    single_loader = torch.utils.data.DataLoader(carrots_train, batch_size=len(carrots_train), num_workers=1)
+    data, labels = next(iter(single_loader))
+
+    d_mean = data.mean(axis=(0,2,3))
+    d_std = data.std(axis=(0,2,3))
+    
+    print("\tDataset mean: {} std: {}".format(d_mean, d_std))
+    
+    # Dataset mean: tensor([0.6142, 0.5552, 0.4108, 0.5264]) std: tensor([0.1480, 0.1209, 0.0966, 0.1800])
+    #d_mean = [0.6142, 0.5552, 0.4108, 0.5264]
+    #d_std = [0.1480, 0.1209, 0.0966, 0.1800]
+    
+    # Set up the dataloader for a normalised dataset:
+    
+    my_transform = Compose([ToTensor(), Normalize(d_mean, d_std)])
+   
+    train_batch = 4
+    
+    if args['mode'] == 'train':
+        print("Loading train data.")
+        carrots_train_norm = crop_datasets.Crop_Dataset(root=args['data_folder'], train=True, sample_size=(384,512), transforms=my_transform)
+        trainloader = torch.utils.data.DataLoader(carrots_train_norm, batch_size=train_batch,shuffle=True, collate_fn = collate_fn)
+
+
+
+    print('Setting up the network.')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    net, optimizer, criterion = net_setup(device, class_weights)
+
+    start_epoch = 0
+    start_iteration = 0
+
+    if args['model']:
+        net, optimizer, start_epoch, start_iteration = load_model(args['model'], net, optimizer, max_iteration=math.ceil(float(len(carrots_train))/train_batch))
+
+    #print(start_epoch, start_iteration)
+
+    if args['mode'] == 'train':
+        #net_out_base = 'SegNetBasic_CA17_FS'
+        net_out_base = args['net_out_name']
+        max_epochs = args['epochs']
+        print_epoch = args['print_epoch']
+        print_iteration = args['print_iteration']
+
+    
+        print('Commencing training on device {}.'.format(device))
+        
+        train(
+            net = net,
+            optimizer = optimizer,
+            criterion = criterion,
+            dataloader = trainloader,
+            device = device,
+            start_epoch = start_epoch,
+            print_epoch = print_epoch,
+            max_epochs = max_epochs,
+            start_iteration = start_iteration,
+            net_out_base = net_out_base,
+            print_iteration = print_iteration
+        )
+ 
+    print("Loading testing data.")
+    
+    carrots_test_norm = crop_datasets.Crop_Dataset(root=args['data_folder'], train=False, sample_size=(384,512), transforms=my_transform)
+    testloader = torch.utils.data.DataLoader(carrots_test_norm, batch_size=1, shuffle=False)
+ 
+    print('Commencing testing on device {}.'.format(device))
+
+    test(
+        net = net,
+        criterion = criterion,
+        dataloader = testloader,
+        device = device,
+        save_images = True
+    )                           
+
+
+if __name__=="__main__":
+    main()
