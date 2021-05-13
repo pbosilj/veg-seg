@@ -43,7 +43,7 @@ class SegNetBasic_Upsample(nn.Module):
 
 class SegNetBasic(nn.Module):
 
-    def __init__(self, in_channels, num_classes, depth = 4, final_batch_norm = True):
+    def __init__(self, in_channels, num_classes, depth = 4, final_batch_norm = False):
         super(SegNetBasic, self).__init__()
 
         self.final_batch_norm = final_batch_norm
@@ -66,7 +66,6 @@ class SegNetBasic(nn.Module):
                                          kernel_size = (1,1))
         if final_batch_norm:
             self.bn = nn.BatchNorm2d(num_features = num_classes)
-        #self.softmax = nn.Softmax2d()
       
     def forward(self, x):
         y = self.LRN(x)
