@@ -36,10 +36,11 @@ class Crop_Dataset(VisionDataset):
                  partial_truth: bool = False,
                  transform: Optional[Callable] = None,
                  target_transform: Optional[Callable] = None,
-                 transforms: Optional[Callable] = None):
+                 transforms: Optional[Callable] = None,
+                 samples_per_image: Optional[Tuple[int, int]] = None):
                  
         super(Crop_Dataset, self).__init__(root, transform=transform, target_transform=target_transform, transforms=transforms)
-        
+               
         self.root = root.rstrip('/')
         self.sample_size = sample_size
 
@@ -60,7 +61,11 @@ class Crop_Dataset(VisionDataset):
 
        
         self.image_size = get_image_size(os.path.join(root, self.directories[0], self.truth_file))[::-1]
-        self.samples_per_image = (int(self.image_size[0] / self.sample_size[0]),int(self.image_size[1] / self.sample_size[1]))
+        self.max_samples_per_image = (int(self.image_size[0] / self.sample_size[0]),int(self.image_size[1] / self.sample_size[1]))
+        if samples_per_image == None or samples_per_image[0] > self.max_samples_per_image[0] or samples_per_image[1] > self.max_samples_per_image[1]:
+            self.samples_per_image = self.max_samples_per_image
+        else:
+            self.samples_per_image = samples_per_image
         self.loaded_image = -1
  
         """
@@ -108,6 +113,7 @@ class Crop_Dataset(VisionDataset):
  
     def __len__(self):
         return len(self.directories)*self.samples_per_image[0]*self.samples_per_image[1]
+        #return len(self.directories)*self.max_samples_per_image[0]*self.max_samples_per_image[1]
   
     def __getitem__(self, index):
         
