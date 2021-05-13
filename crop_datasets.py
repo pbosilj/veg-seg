@@ -199,6 +199,9 @@ class Crop_Dataset(VisionDataset):
             # think if this needs to be processed differently when partial truth is used. I think not.
             truth_rgb_image = io.imread(os.path.join(self.root, img_path, self.truth_file))
             
+            # make sure you consider only the samples that are used
+            truth_rgb_image = truth_rgb_image[:self.sample_size[0]*self.samples_per_image[0]][:self.sample_size[1]*self.samples_per_image[1]]
+            
             for class_name, class_rgb in CROP_CLASSES.items():
                 if class_name == 'unlabelled':
                     continue
