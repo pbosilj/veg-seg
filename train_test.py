@@ -191,16 +191,16 @@ def main():
     mode_parser = parser.add_subparsers(dest = "mode", help = "Train or test model.")
     test_parser = mode_parser.add_parser("test", description = "Train the model.")
 
-    test_parser.add_argument('-m','--model', type=str, required=True)
+    test_parser.add_argument('-m','--model', type=str, required=True, help = "Path to the pre-trained model file.")
       
     train_parser = mode_parser.add_parser("train", description = "Evaluate the model only.")
     
-    train_parser.add_argument('-m','--model', type=str, required=False)
+    train_parser.add_argument('-m','--model', type=str, required=False, help = "Path to the pre-trained model file.")
     
-    train_parser.add_argument("-e", "--epochs", type=int, required = False, default = 10)
-    train_parser.add_argument("-pi", "--print-iteration", type=int, required = False, default = 10)
-    train_parser.add_argument("-pe", "--print-epoch", type=int, required = False, default = 1)
-    train_parser.add_argument("-n", "--net-out-name", type=str, required = True)
+    train_parser.add_argument("-e", "--epochs", type=int, required = False, default = 10, help = "Number of training epochs.")
+    train_parser.add_argument("-pi", "--print-iteration", type=int, required = False, default = 10, help = "How often the current loss is displayed (in iterations).")
+    train_parser.add_argument("-pe", "--print-epoch", type=int, required = False, default = 1, help = "How often the current model is saved (in epochs).")
+    train_parser.add_argument("-n", "--net-out-name", type=str, required = True, help = "Prefix of the saved model filenames.")
     
     args = vars(parser.parse_args())
   
