@@ -5,7 +5,7 @@ from torchvision.datasets import VisionDataset
 
 from typing import Any, Callable, List, Optional, Tuple
 
-from .vegseg_transforms import Normalize, Compose, Resize, ToTensor
+from .transforms import Normalize, Compose, Resize, ToTensor
 
 import os
 
