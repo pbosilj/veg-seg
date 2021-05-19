@@ -9,19 +9,18 @@ The list of required python packages can be found in `requirements.txt`.
 
 ## Running the training, inference and evaluation
 
-The implementation of both the training and testing protocol is in `train_test.py`.
+The implementation of both the training protocol is in `train.py` and inference in `test.py`. For to compare the inference results with the ground truth, you can use the `kappa3class.py`
 
 ### Training
 
 To **train a model**, run the command with the following options:
 ```
-> python ./train_test.py train --help
-usage: train_test.py train [-h] [-m MODEL] [-e EPOCHS] [-pi PRINT_ITERATION] [-pe PRINT_EPOCH] -n NET_OUT_NAME
-
-Evaluate the model only.
+> python ./train.py --help
+usage: train.py [-h] -d DATA_FOLDER [-m MODEL] [-e EPOCHS] [-pi PRINT_ITERATION] [-pe PRINT_EPOCH] -n NET_OUT_NAME
 
 optional arguments:
   -h, --help            show this help message and exit
+  -d DATA_FOLDER, --data-folder DATA_FOLDER
   -m MODEL, --model MODEL
                         Path to the pre-trained model file.
   -e EPOCHS, --epochs EPOCHS
@@ -37,24 +36,23 @@ optional arguments:
 **Example:**<br>
 This example will run the training for 100 epochs, displaying the loss every 10 iterations and saving the model every epoch into files with a prefix `SegNetBasic_CA17_FS`.
 ```
-> python ./train_test.py -d /path/to/carrots train -e 100 -pi 10 -pe 1 -n SegNetBasic_CA17_FS
+> python ./train.py -d /path/to/carrots -e 100 -pi 10 -pe 1 -n SegNetBasic_CA17_FS
 ```
 To continue training the last model produced by the above command, use (same freqency of displaying loss/saving model):
 ```
-> python ./train_test.py -d /path/to/carrots train -e 200 -pi 10 -pe 1 -n SegNetBasic_CA17_FS_test -m SegNetBasic_CA17_FS_e100_i80.pt
+> python ./train.py -d /path/to/carrots -e 200 -pi 10 -pe 1 -n SegNetBasic_CA17_FS_test -m SegNetBasic_CA17_FS_e100_i80.pt
 
 ```
 ### Inference
 
 To **perform inference on the test data**, and save the output images predicted by the network, run the command with the following options:
 ```
-> python ./train_test.py test --help
-usage: train_test.py test [-h] -m MODEL
-
-Train the model.
+> python ./test.py --help
+usage: test.py [-h] -d DATA_FOLDER -m MODEL
 
 optional arguments:
   -h, --help            show this help message and exit
+  -d DATA_FOLDER, --data-folder DATA_FOLDER
   -m MODEL, --model MODEL
                         Path to the pre-trained model file.
 ```
@@ -62,7 +60,7 @@ optional arguments:
 **Example:**<br>
 Test the model saved in the file `SegNetBasic_CA17_FS_e120_i80.pt` (model after epoch 120 and all 80 iterations).
 ```
-> python ./train_test.py -d /path/to/carrots test -m SegNetBasic_CA17_FS_e120_i80.pt
+> python ./test.py -d /path/to/carrots -m SegNetBasic_CA17_FS_e120_i80.pt
 ```
 
 ### Evaluation
