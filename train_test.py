@@ -23,28 +23,19 @@ def save_model(net, optimizer, epoch, iteration, PATH):
         'epoch': epoch,
         'net_state_dict': net.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'iteration': iteration
+#        'iteration': iteration
         }, PATH)
 
 def load_model(PATH, net, optimizer, max_iteration=None):
-    #net = SegNetBasic(*args, **kwargs)
-    #optimizer = torch.optim.Adam(*args, **kwargs)
     
     checkpoint = torch.load(PATH)
     net.load_state_dict(checkpoint['net_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
-    iteration = checkpoint['iteration']+1
 
-    print("Iteration per epoch {}".format(max_iteration))
-    print("Loaded epoch {} iteration {}".format(epoch+1, iteration))
+    print("Loaded epoch {}".format(epoch+1))
 
-    if not max_iteration == None:
-        if iteration == max_iteration:
-            iteration = 0
-            epoch += 1
-
-    return net, optimizer, epoch, iteration
+    return net, optimizer, epoch+1 #, iteration
     
 def cat_list(images, fill_value=0):
     max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
@@ -62,7 +53,8 @@ def collate_fn(batch):
     return batched_imgs, batched_targets
 
 
-def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', start_epoch = 0, start_iteration = 0, print_epoch = 5, print_iteration = 20, net_out_base = 'NET'):
+def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', start_epoch = 0, 
+        print_epoch = 5, print_iteration = 20, net_out_base = 'NET'):
     net.train()
     t_start = time.time()
     print('[Time: %s]' % (time.strftime("%H:%M:%S", time.gmtime())))
@@ -71,9 +63,7 @@ def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', 
     for epoch in range(start_epoch, max_epochs):
         running_loss_iteration = 0.0
         print_iteration_count = 0
-        if epoch > start_epoch:
-            start_iteration = 0
-        for i, data in islice(enumerate(dataloader, 0), start_iteration, None):
+        for i, data in enumerate(dataloader):
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
             
@@ -84,9 +74,7 @@ def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', 
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            
-            #print('[Debug] [Current iteration loss %.3f]' % loss.item())
-            
+                      
             running_loss_epoch += loss.item()
             running_loss_iteration += loss.item()
             print_iteration_count += 1
@@ -98,7 +86,7 @@ def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', 
                 print_iteration_count = 0
 
         if epoch % print_epoch == (print_epoch-1):
-            save_path =  './{}_e{}_i{}.pt'.format(net_out_base, epoch+1, i+1)
+            save_path =  './{}_e{}.pt'.format(net_out_base, epoch+1)
             save_model(net = net, optimizer = optimizer, epoch = epoch, iteration = i, PATH = save_path)
             print('[Time: %s Running: %.5f s] [%d]        loss %.3f, model saved to %s' % (time.strftime("%H:%M:%S", time.gmtime()), t_current-t_start, epoch+1, running_loss_epoch/print_big_iteration_count, save_path))
             running_loss_epoch = 0.0
@@ -148,18 +136,20 @@ def net_setup(device, class_weights=None):
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
     else:
         criterion = torch.nn.CrossEntropyLoss()
-    
-    #optimizer = torch.optim.SGD(net.parameters(), 
-    #                            weight_decay = 0.0005,
-    #                            momentum = 0.9, # but note the docs, might need to change value: https://pytorch.org/docs/stable/_modules/torch/optim/sgd.html#SGD
-    #                            lr = 0.01)
 
     net_weights = map(itemgetter(1), filter(lambda x: 'bias' not in x[0], net.named_parameters()))
     net_biases = map(itemgetter(1), filter(lambda x: 'bias' in x[0], net.named_parameters()))
+
+    # need to un-hardcode these
     
     base_lr = 0.01
     weight_decay = 0.0005
     momentum = 0.9
+
+    net.to(device)
+    if not class_weights == None:
+        class_weights.to(device)
+    criterion.to(device)
 
     optimizer = torch.optim.SGD([
                                     {'params': net_weights, 'lr': base_lr, 'weight_decay': weight_decay },
@@ -167,20 +157,9 @@ def net_setup(device, class_weights=None):
                                 ],
                                 momentum = momentum, # but note the docs, might need to change value: https://pytorch.org/docs/stable/_modules/torch/optim/sgd.html#SGD
                                 lr = base_lr) # probably not needed
-
-    net.to(device)
-    if not class_weights == None:
-        class_weights.to(device)
-    criterion.to(device)
     
     return net, optimizer, criterion
                
-#def makeTorchTensors(sample):
-#    image, label = sample
-#    image = torchvision.transforms.ToTensor()(image)
-#    label = torch.LongTensor(label)
-#    return image, label 
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -242,19 +221,16 @@ def main():
 
 
     print('Setting up the network.')
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net, optimizer, criterion = net_setup(device, class_weights)
 
     start_epoch = 0
-    start_iteration = 0
 
     if args['model']:
-        net, optimizer, start_epoch, start_iteration = load_model(args['model'], net, optimizer, max_iteration=math.ceil(float(len(carrots_train))/train_batch))
-
-    #print(start_epoch, start_iteration)
+        net, optimizer, start_epoch = load_model(args['model'], net, optimizer)
 
     if args['mode'] == 'train':
-        #net_out_base = 'SegNetBasic_CA17_FS'
         net_out_base = args['net_out_name']
         max_epochs = args['epochs']
         print_epoch = args['print_epoch']
@@ -272,7 +248,6 @@ def main():
             start_epoch = start_epoch,
             print_epoch = print_epoch,
             max_epochs = max_epochs,
-            start_iteration = start_iteration,
             net_out_base = net_out_base,
             print_iteration = print_iteration
         )
