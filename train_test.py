@@ -5,12 +5,13 @@ import torch.optim as optim
 import time
 import math
 from itertools import islice
-from operator import itemgetter
 
-from segnet_basic import SegNetBasic
+#from segnet.segnet_basic import SegNetBasic
+from segnet import SegNetBasic
+import segnet
 #from crop_datasets import Crop_Dataset
-from dataset import crop_datasets
-from dataset.vegseg_transforms import Normalize, Compose, Resize, ToTensor
+from dataset import Crop_Dataset
+from dataset.transforms import Normalize, Compose, Resize, ToTensor
 
 import numpy as np
 from skimage import io
@@ -137,29 +138,15 @@ def net_setup(device, class_weights=None):
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
     else:
         criterion = torch.nn.CrossEntropyLoss()
-
-    net_weights = map(itemgetter(1), filter(lambda x: 'bias' not in x[0], net.named_parameters()))
-    net_biases = map(itemgetter(1), filter(lambda x: 'bias' in x[0], net.named_parameters()))
-
-    # need to un-hardcode these
-    
-    base_lr = 0.01
-    weight_decay = 0.0005
-    momentum = 0.9
-
+        
     net.to(device)
     if not class_weights == None:
         class_weights.to(device)
     criterion.to(device)
 
-    optimizer = torch.optim.SGD([
-                                    {'params': net_weights, 'lr': base_lr, 'weight_decay': weight_decay },
-                                    {'params': net_biases, 'lr': base_lr*2 }
-                                ],
-                                momentum = momentum, # but note the docs, might need to change value: https://pytorch.org/docs/stable/_modules/torch/optim/sgd.html#SGD
-                                lr = base_lr) # probably not needed
-    
-    return net, optimizer, criterion
+    return net, criterion
+
+
                
 
 def main():
@@ -188,7 +175,7 @@ def main():
     
     print("Calculating datasets stats.")
   
-    carrots_train = crop_datasets.Crop_Dataset(root=args['data_folder'], train=True, sample_size=(384,512), transforms=ToTensor())
+    carrots_train = Crop_Dataset(root=args['data_folder'], train=True, sample_size=(384,512), transforms=ToTensor())
     
     class_weights = 1.0/carrots_train.get_class_probability()
     print("\tClass weights: {}".format(class_weights))
@@ -216,7 +203,7 @@ def main():
     
     if args['mode'] == 'train':
         print("Loading train data.")
-        carrots_train_norm = crop_datasets.Crop_Dataset(root=args['data_folder'], train=True, sample_size=(384,512), transforms=my_transform)
+        carrots_train_norm = Crop_Dataset(root=args['data_folder'], train=True, sample_size=(384,512), transforms=my_transform)
         trainloader = torch.utils.data.DataLoader(carrots_train_norm, batch_size=train_batch,shuffle=True, collate_fn = collate_fn)
 
 
@@ -224,7 +211,8 @@ def main():
     print('Setting up the network.')
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net, optimizer, criterion = net_setup(device, class_weights)
+    net, criterion = net_setup(device, class_weights)
+    optimizer = segnet.utils.init_SGD_optimizer(net)
 
     start_epoch = 0
 
@@ -255,7 +243,7 @@ def main():
  
     print("Loading testing data.")
     
-    carrots_test_norm = crop_datasets.Crop_Dataset(root=args['data_folder'], train=False, sample_size=(384,512), transforms=my_transform)
+    carrots_test_norm = Crop_Dataset(root=args['data_folder'], train=False, sample_size=(384,512), transforms=my_transform)
     testloader = torch.utils.data.DataLoader(carrots_test_norm, batch_size=1, shuffle=False)
  
     print('Commencing testing on device {}.'.format(device))
