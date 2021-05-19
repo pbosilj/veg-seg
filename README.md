@@ -77,25 +77,26 @@ To **compare the network output with the ground truth** images and calculate Coh
 
 ### Loading the data
 
-The dataloader is implemented in `crop_datasets.py` and uses transformations defined in `vegseg_transforms.py`. It assumes a 80-20 data split (train: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]` test: `[17, 18, 19, 20]`) which can be changed by including `train.txt` or `text.txt` file in the data folder (_Note: custom train and test split setting is not tested).
+The dataloader is implemented in `crop_datasets.py` and uses transformations defined in `vegseg_transforms.py`. It assumes a 80-20 data split (train: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]` test: `[17, 18, 19, 20]`) which can be changed by including `train.txt` or `text.txt` file in the data folder containing folder names for training or testing (other set determined automatically).
 
 Two dataset specific parameters are:
-- `sample_size`: input images will be cut into tiled samples of this size. Default value `(384x512)` matches the input size of SegNetBasic (original `caffe` implementation)
-- `samples_per_image`: number of samples to take from each image in x- and y-direction (if different from the maximum allowed by `sample_size`)
+- `sample_size Optional[Tuple[int, int]]`: input images will be cut into tiled samples of this size. Default value `(384x512)` matches the input size of SegNetBasic (original `caffe` implementation)
+- `samples_per_image: Optional[Tuple[int, int]]`: number of samples to take from each image in x- and y-direction (if different from the maximum allowed by `sample_size`)
+- `partial_truth: bool`: load partial grount truth, with certain pixels unlabelled, for training (ignored while testing)
 
 Examples of using this dataloader can be seen by running the file such as:
 ```
 > python crop_dataset.py
 ```
-and can also be found in `dataloader_demo.ipynb`. They also show how to access class probabilities calculated from the test data (which is used to set the weighting for the loss function).
+and can also be found in `dataloader_demo.ipynb`. They also show how to access class probabilities calculated from the test data (which is used to set the weighting for the loss function). Unlabelled data is ignored while calculating class probabilities.
 
-_Note: currently has been tested only for loading the full ground truth, but partial ground truth (see paper or dataset) is expected._
+_Note: the dataloader has now been tested for loading the partial ground truth, but the training configuration does not process it yet. Need to include ignore_index in the optimizer._
 
 ### Initialising the network
 
 The network is implemented in `segnet_basic.py`. However, for proper training behaviour it is important to **initialise the bias learning rates to x2 of other weight parameters learning rates**. It is also important to **apply weight decay only to the weights and not biases** if used. These details were encoded in the SegNetBasic architecture in `caffe` but have to be set up after net initialisation in `pytorch`.
 
-In addition to the standard parameters `in_channels` and `num_classes`, the implementation allows adjusting the depth of the encoder-decoder through `depth` parameter (default 4 like in the original `caffe` implementation) and adding an additional batch normalisation layer following the classification layer with `filan_batch_norm` param (not used in the original implementation).
+In addition to the standard parameters `in_channels` and `num_classes`, the implementation allows adjusting the depth of the encoder-decoder through `depth` parameter (default 4 like in the original `caffe` implementation) and adding an additional batch normalisation layer following the classification layer with `final_batch_norm` param (not used in the original implementation).
 
 Examples of correctly setting the learning rate for an optimiser used with this implementation of SegNetBasic can be found in `set_segnet_lr.ipynb` and in the `net_setup()` function of `train_test.py`.
 
