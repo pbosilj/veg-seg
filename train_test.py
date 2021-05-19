@@ -128,26 +128,7 @@ def test(net, criterion, dataloader, device='cpu', save_images = False, out_imag
                     io.imsave(fname = './{}_i{}_b{}.png'.format(truth_image_path, i, bi), arr = out_truth)
                     
     dlen = len(dataloader.dataset)
-    print('[Average classification time: %.5f per sample] average loss %.3f' % (t_total_duration/dlen, total_loss/dlen))
-
-
-def net_setup(device, class_weights=None):
-    net = SegNetBasic(in_channels = 4, num_classes = 3, final_batch_norm = False)
-    
-    if not class_weights == None:
-        criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
-        
-    net.to(device)
-    if not class_weights == None:
-        class_weights.to(device)
-    criterion.to(device)
-
-    return net, criterion
-
-
-               
+    print('[Average classification time: %.5f per sample] average loss %.3f' % (t_total_duration/dlen, total_loss/dlen))            
 
 def main():
     parser = argparse.ArgumentParser()
@@ -211,7 +192,15 @@ def main():
     print('Setting up the network.')
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net, criterion = net_setup(device, class_weights)
+    #net, criterion = net_setup(device, class_weights)
+    
+    net = SegNetBasic(in_channels = 4, num_classes = 3, final_batch_norm = False)
+    net.to(device)
+    
+    class_weights.to(device)
+    criterion = torch.nn.CrossEntropyLoss(weight=class_weights)    
+    criterion.to(device)
+    
     optimizer = segnet.utils.init_SGD_optimizer(net)
 
     start_epoch = 0
