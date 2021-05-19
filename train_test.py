@@ -9,14 +9,15 @@ from operator import itemgetter
 
 from segnet_basic import SegNetBasic
 #from crop_datasets import Crop_Dataset
-import crop_datasets
+from dataset import crop_datasets
+from dataset.vegseg_transforms import Normalize, Compose, Resize, ToTensor
 
 import numpy as np
 from skimage import io
 
 import argparse
 
-from vegseg_transforms import Normalize, Compose, Resize, ToTensor
+
 
 def save_model(net, optimizer, epoch, iteration, PATH):
     torch.save({

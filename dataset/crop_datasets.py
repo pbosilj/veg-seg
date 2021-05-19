@@ -5,21 +5,17 @@ from torchvision.datasets import VisionDataset
 
 from typing import Any, Callable, List, Optional, Tuple
 
-from vegseg_transforms import Normalize, Compose, Resize, ToTensor
+from .vegseg_transforms import Normalize, Compose, Resize, ToTensor
 
 import os
 
 import traceback
 
-from get_image_size import get_image_size
+from .get_image_size import get_image_size
 
 from skimage import io
 import numpy as np
 
-
-
-
-#class Crop_Dataset(torch.utils.data.Dataset):
 class Crop_Dataset(VisionDataset):
     """
     A data loader for crop datasets (CA17, ON17)
