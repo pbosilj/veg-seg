@@ -8,6 +8,7 @@ import segnet
 from dataset import Crop_Dataset
 from dataset.transforms import Normalize, Compose, ToTensor
 
+import sys
 import argparse
 
 def cat_list(images, fill_value=0):
@@ -64,25 +65,49 @@ def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', 
             running_loss_epoch = 0.0
             print_big_iteration_count = 0
 
+
+
 def main():
     train_parser = argparse.ArgumentParser()
 
-    train_parser.add_argument("-d", "--data-folder", type=str, required=True)
-       
-    train_parser.add_argument('-m','--model', type=str, required=False, help = "Path to the pre-trained model file.")
+    train_parser.add_argument("-d", "--data-folder", type=str, required=True)     
+    
+    train_parser.add_argument("-gt", "--ground-truth", type=str, required = True, choices = ['full', 'partial'], help='Whether full or partial annotations are used in training. This is important for data normalisation (always done from the test set).')
+    
+    train_parser.add_argument("-s", "--sample-size", nargs=2, type=int, default=(384,512), required=False, help="Input images are divided into samples of dimensions HEIGHTxWIDTH", metavar=('HEIGHT', 'WIDTH'))
+    train_parser.add_argument("-spi", "--samples-per-image", nargs=2, type=int, required=False, metavar = ('COL_SAMPLES', 'ROW_SAMPLES'), help="Take at most COL_SAMPLESxROW_SAMPLES from the image")
+
     
     train_parser.add_argument("-e", "--epochs", type=int, required = False, default = 10, help = "Number of training epochs.")
     train_parser.add_argument("-pi", "--print-iteration", type=int, required = False, default = 10, help = "How often the current loss is displayed (in iterations).")
-    train_parser.add_argument("-pe", "--print-epoch", type=int, required = False, default = 1, help = "How often the current model is saved (in epochs).")
+    train_parser.add_argument("-se", "--save-epoch", type=int, required = False, default = 1, help = "How often the current model is saved (in epochs).")
+       
     train_parser.add_argument("-n", "--net-out-name", type=str, required = True, help = "Prefix of the saved model filenames.")
+    
+    train_parser.add_argument('-m','--model', type=str, required=False, help = "Path to the pre-trained model file.")   
+    train_parser.add_argument('-t', '--training_mode', type=str, choices=['continue', 'finetune'], required = ('--model' in ' '.join(sys.argv)) or ('-m' in ' '.join(sys.argv)),
+                            help='Mode in which to continue training.\n' +
+                            '`continue` loads the optimiser and continues training with saved settings.\n'+
+                            '`finetune` loads the model only and reinitialises the optimiser with finetuning settings.')
     
     args = vars(train_parser.parse_args())
   
     # Get the dataset statistics:
     
-    print("Calculating datasets stats.")
+    print("Calculating datasets stats (from training set).")
   
-    class_weights, d_mean, d_std = data_stats(args['data_folder'])
+    sample_size = tuple(args['sample_size'])
+    if not args['samples_per_image']:
+        samples_per_image = None
+    else:
+        samples_per_image = tuple(args['samples_per_image'])
+    
+    class_weights, d_mean, d_std = data_stats(
+                                            args['data_folder'],
+                                            partial_truth = (args['ground_truth']=='partial'),
+                                            sample_size=sample_size,
+                                            samples_per_image = samples_per_image,
+                                    )
     
     # Network setup and loading
 
@@ -95,14 +120,25 @@ def main():
     net.to(device)
     
     class_weights.to(device)
-    criterion = torch.nn.CrossEntropyLoss(weight=class_weights)    
+    if args['ground_truth'] == 'full':
+        criterion = torch.nn.CrossEntropyLoss(weight=class_weights)    
+    else:
+        criterion = torch.nn.CrossEntropyLoss(weight=class_weights, ignore_index = Crop_Dataset.get_ignore_index())
     criterion.to(device)
     
-    optimizer = segnet.utils.init_SGD_optimizer(net)
+    # if training from scratch or continuing training, set optimiser to regular settings
 
-    if args['model']:
-        net, optimizer, start_epoch = load_model(args['model'], net, optimizer)
+    start_epoch = 0
+    if not args['model'] or args['training_mode']=='continue': 
+        optimizer = segnet.utils.init_SGD_optimizer(net)
 
+        if args['model']: # equivalent if args['trainig_mode']=='continue'
+            net, optimizer, start_epoch = load_model(args['model'], net, optimizer)
+        #print(optimizer.state_dict())
+    else: #if args['training_mode']='finetune':
+        net, _, _ = load_model(args['model'], net)
+        optimizer = segnet.utils.init_SGD_optimizer(net, fine_tune=True)
+           
     print("Setting up the training dataset.")
         
     # Set up the dataloader for a normalised dataset:
@@ -111,18 +147,19 @@ def main():
     train_batch = 4
     
     crops_train_norm = Crop_Dataset(root=args['data_folder'], train=True,
-                                     sample_size=(384,512), # un hard-code this
-                                     transforms=my_transform)
+                                     sample_size=sample_size,
+                                     samples_per_image = samples_per_image,
+                                     transforms=my_transform,
+                                     partial_truth = (args['ground_truth']=='partial'))
     trainloader = torch.utils.data.DataLoader(crops_train_norm, batch_size=train_batch,shuffle=True, collate_fn = collate_fn)
 
     # Model training
 
     print('Commencing training on device {}.'.format(device))
 
-    start_epoch = 0
     net_out_base = args['net_out_name']
     max_epochs = args['epochs']
-    print_epoch = args['print_epoch']
+    print_epoch = args['save_epoch']
     print_iteration = args['print_iteration']
     
     train(

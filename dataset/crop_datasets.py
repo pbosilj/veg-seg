@@ -65,11 +65,16 @@ class Crop_Dataset(VisionDataset):
 
        
         self.image_size = get_image_size(os.path.join(root, self.directories[0], self.truth_file))[::-1]
+        self.sample_size = (min(self.sample_size[0], self.image_size[0]), min(self.sample_size[1], self.image_size[1]))
         self.max_samples_per_image = (int(self.image_size[0] / self.sample_size[0]),int(self.image_size[1] / self.sample_size[1]))
         if samples_per_image == None or samples_per_image[0] > self.max_samples_per_image[0] or samples_per_image[1] > self.max_samples_per_image[1]:
             self.samples_per_image = self.max_samples_per_image
         else:
             self.samples_per_image = samples_per_image
+        
+        print("Dataset loaded with {}x{} samples per image of size {}x{}.".format(self.samples_per_image[0], self.samples_per_image[1], self.sample_size[0], self.sample_size[1]))    
+
+        
         self.loaded_image = -1
  
         """
@@ -168,7 +173,7 @@ class Crop_Dataset(VisionDataset):
         counts = dict.fromkeys([k for k in self.IMG_CLASSES.keys() if not k == 'unlabelled'], 0)
 
         for img_path in self.directories:
-            # think if this needs to be processed differently when partial truth is used. I think not.
+            # if partial_truth=True, unlabelled pixels are ignored for the training set, but full truth is used for test set stats
             truth_rgb_image = io.imread(os.path.join(self.root, img_path, self.truth))
             
             # make sure you consider only the samples that are used
@@ -180,9 +185,10 @@ class Crop_Dataset(VisionDataset):
                 counts[class_name] += np.sum(np.all(truth_rgb_image == class_rgb, axis=2))
 
         return counts
-
-    def get_ignore_index(self):
-        return self.ORD_CLASSES['unlabelled']
+        
+    @classmethod
+    def get_ignore_index(cls):
+        return cls.ORD_CLASSES['unlabelled']
 
     # Only for the portion currently used (train/test)
     def get_class_probability(self):
