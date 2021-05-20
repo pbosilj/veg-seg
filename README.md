@@ -52,7 +52,7 @@ To continue training the last model produced by the above command, use (same fre
 > python ./train.py -d /path/to/carrots -gt full -e 200 -pi 10 -se 1 -n SegNetBasic_CA17_FS -m SegNetBasic_CA17_FS_e100.pt -t continue
 
 ```
-Assuming the best performing model was in epoch 137 and saved in `SegNetBasic_CA17_FS_e_137.pt`, following will _finetune_ this network for onions using _partial annotations only_:
+Assuming the best performing model was in epoch 137 and saved in `SegNetBasic_CA17_FS_e_137.pt`, following will _finetune_ this network for onions using _partial annotations only_ and save the resulting models with a prefix `SegNet_Basic_ON17_partial_FT_CA17`:
 ```
 > python ./train.py -d /path/to/onions -gt partial -e 50 -pi 10 -se 1 -n SegNetBasic_ON17_partial_FT_CA17 -m SegNetBasic_CA17_FS_e137.pt -t finetune
 
@@ -93,14 +93,6 @@ When testing a model trained with _partial ground truth_ it is important to spec
 ```
 > python ./test.py -d /path/to/onions -gt partial -m SegNetBasic_ON17_partial_FT_CA17_e75.pt
 ```
-
-### Evaluation
-
-To **compare the network output with the ground truth** images and calculate Cohen's Kappa, after performing inference on the test set (step above), run:
-```
-> python kappa3class.py -n 80 -p './'
-```
-(If you change the size of the samples cropped from the images, and consequently the size of train/test datasets, you will have to adjust `-n 80` to the new size of the train set.)
 
 ## Understanding the code
 
