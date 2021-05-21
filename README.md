@@ -16,11 +16,12 @@ The implementation of both the training protocol is in `train.py` and inference+
 To **train a model**, run the `train.py`. The command allows the following options:
 ```
 > python ./train.py --help
-usage: train.py [-h] -d DATA_FOLDER -gt {full,partial} [-s HEIGHT WIDTH] [-spi COL_SAMPLES ROW_SAMPLES] [-e EPOCHS] [-pi PRINT_ITERATION] [-se SAVE_EPOCH] -n NET_OUT_NAME [-m MODEL] [-t {continue,finetune}]
+usage: train.py [-h] -d PATH -gt {full,partial} [-s HEIGHT WIDTH] [-spi COL_SAMPLES ROW_SAMPLES] [-e EPOCHS] [-pi PRINT_ITERATION] [-se SAVE_EPOCH] -n FILENAME_PREFIX [-m PATH] [-t {continue,finetune}]
 
 optional arguments:
   -h, --help            show this help message and exit
-  -d DATA_FOLDER, --data-folder DATA_FOLDER
+  -d PATH, --data-folder PATH
+                        Path to the dataset.
   -gt {full,partial}, --ground-truth {full,partial}
                         Whether full or partial annotations are used in training. This is important for data normalisation (always done from the test set).
   -s HEIGHT WIDTH, --sample-size HEIGHT WIDTH
@@ -33,9 +34,9 @@ optional arguments:
                         How often the current loss is displayed (in iterations).
   -se SAVE_EPOCH, --save-epoch SAVE_EPOCH
                         How often the current model is saved (in epochs).
-  -n NET_OUT_NAME, --net-out-name NET_OUT_NAME
+  -n FILENAME_PREFIX, --net-out-name FILENAME_PREFIX
                         Prefix of the saved model filenames.
-  -m MODEL, --model MODEL
+  -m PATH, --model PATH
                         Path to the pre-trained model file.
   -t {continue,finetune}, --training_mode {continue,finetune}
                         Mode in which to continue training. `continue` loads the optimiser and continues training with saved settings. `finetune` loads the model only and reinitialises the optimiser with

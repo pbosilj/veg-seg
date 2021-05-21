@@ -70,7 +70,7 @@ def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', 
 def main():
     train_parser = argparse.ArgumentParser()
 
-    test_parser.add_argument("-d", "--data-folder", type=str, required=True, metavar=('PATH'), help="Path to the dataset.")    
+    train_parser.add_argument("-d", "--data-folder", type=str, required=True, metavar=('PATH'), help="Path to the dataset.")    
     
     train_parser.add_argument("-gt", "--ground-truth", type=str, required = True, choices = ['full', 'partial'], help='Whether full or partial annotations are used in training. This is important for data normalisation (always done from the test set).')
     
