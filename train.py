@@ -70,7 +70,7 @@ def train(net, optimizer, criterion, dataloader, max_epochs = 50, device='cpu', 
 def main():
     train_parser = argparse.ArgumentParser()
 
-    train_parser.add_argument("-d", "--data-folder", type=str, required=True)     
+    test_parser.add_argument("-d", "--data-folder", type=str, required=True, metavar=('PATH'), help="Path to the dataset.")    
     
     train_parser.add_argument("-gt", "--ground-truth", type=str, required = True, choices = ['full', 'partial'], help='Whether full or partial annotations are used in training. This is important for data normalisation (always done from the test set).')
     
@@ -82,9 +82,9 @@ def main():
     train_parser.add_argument("-pi", "--print-iteration", type=int, required = False, default = 10, help = "How often the current loss is displayed (in iterations).")
     train_parser.add_argument("-se", "--save-epoch", type=int, required = False, default = 1, help = "How often the current model is saved (in epochs).")
        
-    train_parser.add_argument("-n", "--net-out-name", type=str, required = True, help = "Prefix of the saved model filenames.")
+    train_parser.add_argument("-n", "--net-out-name", type=str, required = True, help = "Prefix of the saved model filenames.", metavar=('FILENAME_PREFIX'))
     
-    train_parser.add_argument('-m','--model', type=str, required=False, help = "Path to the pre-trained model file.")   
+    train_parser.add_argument('-m','--model', type=str, required=False, help = "Path to the pre-trained model file.", metavar=('PATH'))   
     train_parser.add_argument('-t', '--training_mode', type=str, choices=['continue', 'finetune'], required = ('--model' in ' '.join(sys.argv)) or ('-m' in ' '.join(sys.argv)),
                             help='Mode in which to continue training.\n' +
                             '`continue` loads the optimiser and continues training with saved settings.\n'+

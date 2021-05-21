@@ -72,9 +72,6 @@ class Crop_Dataset(VisionDataset):
         else:
             self.samples_per_image = samples_per_image
         
-        print("Dataset loaded with {}x{} samples per image of size {}x{}.".format(self.samples_per_image[0], self.samples_per_image[1], self.sample_size[0], self.sample_size[1]))    
-
-        
         self.loaded_image = -1
  
         """
@@ -123,11 +120,16 @@ class Crop_Dataset(VisionDataset):
         else:
             self.directories = test_list
             # Always read full truth for testing
-            self.truth = self.truth_file
-            
-
+            self.truth = self.truth_file            
         
         self.counts = self.__compute_class_probability()
+        
+                
+        print("Dataset loaded with {}x{} samples per image of size {}x{} (total {} image samples).".format(self.samples_per_image[0],
+                                                                                                           self.samples_per_image[1],
+                                                                                                           self.sample_size[0],
+                                                                                                           self.sample_size[1],
+                                                                                                           self.__len__()))  
  
     def __len__(self):
         return len(self.directories)*self.samples_per_image[0]*self.samples_per_image[1]

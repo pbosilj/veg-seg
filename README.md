@@ -13,7 +13,7 @@ The implementation of both the training protocol is in `train.py` and inference+
 
 ### Training
 
-To **train a model**, run the command with the following options:
+To **train a model**, run the `train.py`. The command allows the following options:
 ```
 > python ./train.py --help
 usage: train.py [-h] -d DATA_FOLDER -gt {full,partial} [-s HEIGHT WIDTH] [-spi COL_SAMPLES ROW_SAMPLES] [-e EPOCHS] [-pi PRINT_ITERATION] [-se SAVE_EPOCH] -n NET_OUT_NAME [-m MODEL] [-t {continue,finetune}]
@@ -65,33 +65,41 @@ Resuming training of a network which was fine-tuned from pre-initialised weights
 
 ### Inference
 
-To **perform inference and evaluation on the test data**, and save the output images predicted by the network, run the command with the following options:
+To **perform inference and evaluation on the test data** use `test.py`. It allows testing one or multiple models at once, optionally saving the output images predicted by the network, and/or saving the best performing model under a new file name. The command allows the following options:
 ```
 > python ./test.py --help
-usage: test.py [-h] -d DATA_FOLDER -gt {full,partial} [-s HEIGHT WIDTH] [-spi COL_SAMPLES ROW_SAMPLES] -m MODEL [-si]
+usage: test.py [-h] -d PATH -gt {full,partial} [-s HEIGHT WIDTH] [-spi COL_SAMPLES ROW_SAMPLES] -m PATH [PATH ...] [-v] [-si] [-cb FILENAME]
 
 optional arguments:
   -h, --help            show this help message and exit
-  -d DATA_FOLDER, --data-folder DATA_FOLDER
+  -d PATH, --data-folder PATH
+                        Path to the dataset.
   -gt {full,partial}, --ground_truth {full,partial}
                         Whether full or partial annotations are used in training. This is important for data normalisation (always done from the test set).
   -s HEIGHT WIDTH, --sample-size HEIGHT WIDTH
                         Input images are divided into samples of dimensions HEIGHTxWIDTH
   -spi COL_SAMPLES ROW_SAMPLES, --samples-per-image COL_SAMPLES ROW_SAMPLES
                         Take at most COL_SAMPLESxROW_SAMPLES from the image
-  -m MODEL, --model MODEL
-                        Path to the pre-trained model file.
-  -si, --save-images    Save output and ground truth images for visual inspection
+  -m PATH [PATH ...], --model PATH [PATH ...]
+                        Path to the pre-trained model file(s).
+  -v, --verbose         Print per-image accuracy and kappa scores.
+  -si, --save-images    Save output and ground truth images for visual inspection.
+  -cb FILENAME, --copy-best FILENAME
+                        Copy the best model to FILENAME.
 ```
 
 **Example:**<br>
-Test the model saved in the file `SegNetBasic_CA17_FS_e120.pt` (model after epoch 120).
+Test the model saved in the file `SegNetBasic_CA17_FS_e120.pt` (model after epoch 120), with per-image output and saving the images for visual inspection.
 ```
-> python ./test.py -d /path/to/carrots -gt full -m SegNetBasic_CA17_FS_e120.pt
+> python ./test.py -d /path/to/carrots -gt full -m SegNetBasic_CA17_FS_e120.pt -v -si
 ```
 When testing a model trained with _partial ground truth_ it is important to specify this for testing, as _training set stats_ are used for data normalisation before inference.
 ```
 > python ./test.py -d /path/to/onions -gt partial -m SegNetBasic_ON17_partial_FT_CA17_e75.pt
+```
+Test multiple models at once and save a copy of the best model in `SegNetBasic_CA17_FS_best.pt`.
+```
+> python ./test.py -d /path/to/carrots -gt full -m SegNetBasic_CA17_FS_*.pt -cb SegNetBasic_CA17_FS_best.pt
 ```
 
 ## Understanding the code
